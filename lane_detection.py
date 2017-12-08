@@ -1,3 +1,4 @@
+import numpy as np
 from statistics import mean
 from numpy.linalg import lstsq
 
