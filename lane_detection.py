@@ -1,77 +1,92 @@
+import sys
+import cv2
 import numpy as np
-from statistics import mean
-from numpy.linalg import lstsq
 
-def average_lane(lane_data):
-	x1s = []
-	y1s = []
-	x2s = []
-	y2s = []
-	for data in lane_data:
-		x1s.append(data[2][0])
-		y1s.append(data[2][1])
-		x2s.append(data[2][2])
-		y2s.append(data[2][3])
-	return int(mean(x1s)), int(mean(y1s)), int(mean(x2s)), int(mean(y2s))
+def detect_yellow(image):
+	# sand mask (brown)
+	lower = np.uint8([154, 163, 152])
+	upper = np.uint8([179, 158, 121])
+	brown_mask = cv2.inRange(image, lower, upper)
+	# lane line mask (yellow)
+	lower = np.uint8([181, 168, 80])
+	upper = np.uint8([255, 240, 140])
+	yellow_mask = cv2.inRange(image, lower, upper)
+	mask = cv2.bitwise_or(yellow_mask, brown_mask)
+	return cv2.bitwise_and(image, image, mask=mask)
 
-def draw_lines(img, lines):
-	try:
-		ys = []
-		for i in lines:
-			for ii in i:
-				ys += [ii[1], ii[3]]
-		min_y = min(ys)
-		max_y = 600
-		line_dict = {}
+def hough_lines(image):
+    return cv2.HoughLinesP(image, rho=1, theta=np.pi/180, threshold=20, minLineLength=30, maxLineGap=300)
 
-		for idx, i in enumerate(lines):
-			for xyxy in i:
-				x_coords = (xyxy[0], xyxy[2])
-				y_coords = (xyxy[1], xyxy[3])
-				A = np.vstack([x_coords, np.ones(len(x_coords))]).T
-				m, b = lstsq(A, y_coords)[0]
-				
-				x1 = (min_y-b) / m
-				x2 = (max_y-b) / m
+def average_slope_intercept(lines):
+    left_lines    = [] # (slope, intercept)
+    left_weights  = [] # (length,)
+    right_lines   = [] # (slope, intercept)
+    right_weights = [] # (length,)
+    if lines is not None:
+	    for line in lines:
+	        for x1, y1, x2, y2 in line:
+	            if x2==x1:
+	                continue # ignore a vertical line
+	            slope = (y2-y1)/(x2-x1)
+	            intercept = y1 - slope*x1
+	            length = np.sqrt((y2-y1)**2+(x2-x1)**2)
+	            if slope < 0: # y is reversed in image
+	                left_lines.append((slope, intercept))
+	                left_weights.append((length))
+	            else:
+	                right_lines.append((slope, intercept))
+	                right_weights.append((length))
+	    
+	    # add more weight to longer lines    
+	    left_lane  = np.dot(left_weights,  left_lines) /np.sum(left_weights)  if len(left_weights) > 0 else None
+	    right_lane = np.dot(right_weights, right_lines)/np.sum(right_weights) if len(right_weights) > 0 else None
+	    
+	    return left_lane, right_lane # (slope, intercept), (slope, intercept)
 
-				line_dict[idx] = [m, b, [int(x1), min_y, int(x2), max_y]]
+def make_line_points(y1, y2, line):
+    """
+    Convert a line represented in slope and intercept into pixel points
+    """
+    if line is None:
+        return None
+    
+    slope, intercept = line
+    inf = sys.maxsize // 2
+    # make sure everything is integer as cv2.line requires it
+    try:
+    	x1 = int((y1 - intercept)/slope)
+    except OverflowError:
+    	x1 = inf
+    try:
+    	x2 = int((y2 - intercept)/slope)
+    except OverflowError:
+    	x2 = inf
+    y1 = int(y1)
+    y2 = int(y2)
+    
+    return ((x1, y1), (x2, y2))
 
-		final_lanes = {}
+def lane_lines(image, lines):
+	if lines is not None:
+		left_lane, right_lane = average_slope_intercept(lines)
+		if(left_lane is not None and right_lane is not None):
+			y1 = image.shape[0] # bottom of the image
+			y2 = y1*0.6         # slightly lower than the middle
 
-		for idx in line_dict:
-			final_lanes_copy = final_lanes.copy()
-			m = line_dict[idx][0]
-			b = line_dict[idx][1]
-			line = line_dict[idx][2]
+			left_line  = make_line_points(y1, y2, left_lane)
+			right_line = make_line_points(y1, y2, right_lane)
 
-			if len(final_lanes) == 0:
-				final_lanes[m] = [ [m,b,line] ]
+			return left_line, right_line
 
-			else:
-				found_copy = False
-				for other_ms in final_lanes_copy:
-					if not found_copy:
-						if abs(other_ms*1.2) > abs(m) > abs(other_ms*0.8):
-							if abs(final_lanes_copy[other_ms][0][1]*1.2) > abs(b) > abs(final_lanes_copy[other_ms][0][1]*0.8):
-								final_lanes[other_ms].append([m,b,line])
-								found_copy = True
-								break
-							else:
-								final_lanes[m] = [ [m,b,line] ]
-
-		line_counter = {}
-		for lanes in final_lanes:
-			line_counter[lanes] = len(final_lanes[lanes])
-
-		top_lanes = sorted(line_counter.items(), key=lambda item: item[1])[::-1][:2]
-
-		lane1_id = top_lanes[0][0]
-		lane2_id = top_lanes[1][0]
-
-		l1_x1, l1_y1, l1_x2, l1_y2 = average_lane(final_lanes[lane1_id])
-		l2_x1, l2_y1, l2_x2, l2_y2 = average_lane(final_lanes[lane2_id])
-
-		return [l1_x1, l1_y1, l1_x2, l1_y2], [l2_x1, l2_y1, l2_x2, l2_y2], lane1_id, lane2_id
-	
-	except Exception as e:
-		print("draw_lines(): ", str(e))
+def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=20):
+	if lines is not None:
+		for line in lines:
+			if line is not None:
+				try:
+					cv2.line(image, *line,  color, thickness)
+				except Exception as e:
+					print(str(e))
+		return image, False
+	else:
+		print("No Lanes Found")
+		return image, True
