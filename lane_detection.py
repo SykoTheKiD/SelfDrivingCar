@@ -1,6 +1,13 @@
 import sys
 import cv2
+import math
 import numpy as np
+
+LOWER_TOLERANCE = 200
+UPPER_TOLERANCE = 400
+
+def valid_lane(distance):
+	return LOWER_TOLERANCE <= distance <= UPPER_TOLERANCE
 
 def detect_yellow(image):
 	# sand mask (brown)
@@ -66,6 +73,14 @@ def make_line_points(y1, y2, line):
     
     return ((x1, y1), (x2, y2))
 
+def distance(left_lane, right_lane):
+	return math.sqrt(math.pow((right_lane[0] - left_lane[0]), 2) + math.pow((right_lane[1] - left_lane[1]), 2))
+
+def min_distance(left, right):
+	lower = distance(left[0], right[0])
+	upper = distance(left[1], right[1])
+	return min(lower, upper)
+
 def lane_lines(image, lines):
 	if lines is not None:
 		left_lane, right_lane = average_slope_intercept(lines)
@@ -75,18 +90,19 @@ def lane_lines(image, lines):
 
 			left_line  = make_line_points(y1, y2, left_lane)
 			right_line = make_line_points(y1, y2, right_lane)
-
-			return left_line, right_line
+			distance = min_distance(left_line, right_line)
+			return left_line, right_line, distance
 
 def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=20):
 	if lines is not None:
-		for line in lines:
+		if not valid_lane(lines[2]):
+			return image, True, "Invalid Lanes"
+		for line in lines[0:2]:
 			if line is not None:
 				try:
 					cv2.line(image, *line,  color, thickness)
 				except Exception as e:
 					print(str(e))
-		return image, False
+		return image, False, "Valid"
 	else:
-		print("No Lanes Found")
-		return image, True
+		return image, True, "No Lanes Found"
