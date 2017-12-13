@@ -2,17 +2,13 @@ import cv2
 import time
 import numpy as np
 from PIL import ImageGrab
+from car_status import Car
 import lane_detection as ld
 import game_controller as gc
 import image_processing as ip
 
-
-MAX_CRASH_COUNT = 300
-font                   = cv2.FONT_HERSHEY_SIMPLEX
-bottomLeftCornerOfText = (10,500)
-fontScale              = 1
-fontColor              = (255,255,255)
-lineType               = 2
+DISPLAY_CAR_VIEW = False
+DISPLAY_MAIN_VIEW = True
 
 def process_image(image, colour=[0,255,0], thickness=30):
 	original_image = image
@@ -26,20 +22,19 @@ def process_image(image, colour=[0,255,0], thickness=30):
 	return processed_image, original_image, error, message
 
 def main():
-	crash = 0
+	car = Car()
 	while True:
 		screen_image = ImageGrab.grab(bbox=(0,40,800,640))
 		screen = np.array(screen_image)
 		new_screen, original_image, error, message = process_image(screen)
-		print("Crash:", crash, message)
-		if error:
-			crash += 1
+		car.update_car(error, message)
 		if new_screen is not None and original_image is not None:
-			if crash == MAX_CRASH_COUNT:
+			if car.crashed:
 				gc.restart_game()
-				crash = 0
-			# cv2.imshow('Car View', new_screen)
-			cv2.imshow('Lane Lines', cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
+			if DISPLAY_CAR_VIEW:
+				cv2.imshow('Car View', new_screen)
+			if DISPLAY_MAIN_VIEW:
+				cv2.imshow('Lane Lines', cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
 			if cv2.waitKey(25) & 0xFF == ord('q'):
 				cv2.destroyAllWindows()
 				break

@@ -1,16 +1,17 @@
-import numpy as np
-import os, time
-from PIL import ImageOps, ImageGrab
 
-def screenGrab():
-    im = ImageGrab.grab(bbox=(0,40,800,640))
-    return im
+MAX_CRASH_COUNT = 250
 
+class Car(object):
+	"""docstring for Car"""
+	def __init__(self):
+		self.flag = 0
+		self.crashed = False
 
-def grab():
-    im = ImageOps.grayscale(ImageGrab.grab(bbox=(0,40,800,625)))
-    a = np.array(im.getcolors())
-    a = a.sum()
-    # im.save(os.getcwd() + '\\Snap__' + str(int(time.time())) + '.png', 'PNG')
-    print(a)
-    return a
+	def update_car(self, error, message):
+		if error:
+			self.flag += 1
+			print(message)
+		if self.flag == MAX_CRASH_COUNT:
+			print("End Run, Limit {} Reached".format(MAX_CRASH_COUNT))
+			self.crashed = True
+

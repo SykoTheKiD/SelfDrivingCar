@@ -2,6 +2,7 @@ import sys
 import cv2
 import math
 import numpy as np
+import car_errors as ce
 
 LOWER_TOLERANCE = 200
 UPPER_TOLERANCE = 400
@@ -96,13 +97,13 @@ def lane_lines(image, lines):
 def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=20):
 	if lines is not None:
 		if not valid_lane(lines[2]):
-			return image, True, "Invalid Lanes"
+			return image, ce.ERROR_VALUES[ce.INVALID_LANES], ce.INVALID_LANES
 		for line in lines[0:2]:
 			if line is not None:
 				try:
 					cv2.line(image, *line,  color, thickness)
 				except Exception as e:
 					print(str(e))
-		return image, False, "Valid"
+		return image, ce.ERROR_VALUES[ce.VALID], ce.VALID
 	else:
-		return image, True, "No Lanes Found"
+		return image, ce.ERROR_VALUES[ce.NO_LANES], ce.NO_LANES

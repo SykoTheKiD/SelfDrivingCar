@@ -1,0 +1,15 @@
+NO_LANES = "No Lanes Found"
+VALID = "VALID"
+INVALID_LANES = "Invalid Lanes"
+
+ERROR_VALUES = {
+	NO_LANES: True,
+	VALID: False,
+	INVALID_LANES: True
+}
+
+SCORES = {
+	NO_LANES: -50,
+	VALID: 10,
+	INVALID_LANES: -100
+}
