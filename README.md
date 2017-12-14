@@ -1,6 +1,6 @@
 # Self-Driving Car
 
-<img src="https://i.imgur.com/xZ9W1NU.gif" height=250 width=300>
+<img src="https://i.imgur.com/xZ9W1NU.gif" height=250 width=400>
 
 ## Simple OpenCV lane detetection to let a car maneuver 
 
