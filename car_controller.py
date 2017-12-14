@@ -3,25 +3,26 @@ import win32api
 import win32con
 import pyautogui as mv
 
-TURN_TIME = 0.9
-
 def forward():
 	mv.keyUp('s')
 	mv.keyDown('w')
 
-def left(time=TURN_TIME):
+def left(turn_time):
 	mv.keyDown('a')
-	time.sleep(TURN_TIME)
+	time.sleep(turn_time)
 	mv.keyUp('a')
 
-def right(time=TURN_TIME):
+def right(turn_time):
 	mv.keyDown('d')
-	time.sleep(TURN_TIME)
+	time.sleep(turn_time)
 	mv.keyUp('d')
 
 def reverse():
 	mv.keyUp('w')
 	mv.keyDown('s')
 
-def center_car(left_lane, right_lane):
-	pass
+def clear_keys():
+	mv.keyUp('w')
+	mv.keyUp('a')
+	mv.keyUp('s')
+	mv.keyUp('d')

@@ -3,9 +3,13 @@ import cv2
 import math
 import numpy as np
 import car_errors as ce
+import race_track as rt
 
 LOWER_TOLERANCE = 200
 UPPER_TOLERANCE = 400
+
+def sigmoid(x):
+  return math.fabs(1 / (1 + math.exp(-x)))
 
 def valid_lane(distance):
 	return LOWER_TOLERANCE <= distance <= UPPER_TOLERANCE
@@ -46,9 +50,9 @@ def average_slope_intercept(lines):
 	                right_weights.append((length))
 	    
 	    # add more weight to longer lines    
-	    left_lane  = np.dot(left_weights,  left_lines) /np.sum(left_weights)  if len(left_weights) > 0 else None
-	    right_lane = np.dot(right_weights, right_lines)/np.sum(right_weights) if len(right_weights) > 0 else None
-	    
+	    left_lane  = np.dot(left_weights,  left_lines) / np.sum(left_weights)  if len(left_weights) > 0 else None
+	    right_lane = np.dot(right_weights, right_lines) / np.sum(right_weights) if len(right_weights) > 0 else None
+	    print(__name__, "Left", left_lane, "Right", right_lane)
 	    return left_lane, right_lane # (slope, intercept), (slope, intercept)
 
 def make_line_points(y1, y2, line):
@@ -85,25 +89,31 @@ def min_distance(left, right):
 def lane_lines(image, lines):
 	if lines is not None:
 		left_lane, right_lane = average_slope_intercept(lines)
+		turn = rt.STRAIGHT
 		if(left_lane is not None and right_lane is not None):
 			y1 = image.shape[0] # bottom of the image
 			y2 = y1*0.6         # slightly lower than the middle
-
+			if left_lane[0] < 0:
+				turn = rt.LEFT_TURN
+				turn_time = sigmoid(left_lane[0])
+			elif right_lane[0] < 0:
+				turn = rt.RIGHT_TURN
+				turn_time = sigmoid(right_lane[0])
 			left_line  = make_line_points(y1, y2, left_lane)
 			right_line = make_line_points(y1, y2, right_lane)
 			distance = min_distance(left_line, right_line)
-			return left_line, right_line, distance
+			return left_line, right_line, distance, turn, turn_time
 
 def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=20):
 	if lines is not None:
 		if not valid_lane(lines[2]):
-			return image, ce.ERROR_VALUES[ce.INVALID_LANES], ce.INVALID_LANES
+			return image, ce.ERROR_VALUES[ce.INVALID_LANES], ce.INVALID_LANES, lines[3], lines[4]
 		for line in lines[0:2]:
 			if line is not None:
 				try:
 					cv2.line(image, *line,  color, thickness)
 				except Exception as e:
-					print(str(e))
-		return image, ce.ERROR_VALUES[ce.VALID], ce.VALID
+					print(__name__, str(e))
+		return image, ce.ERROR_VALUES[ce.VALID], ce.VALID, lines[3], lines[4]
 	else:
-		return image, ce.ERROR_VALUES[ce.NO_LANES], ce.NO_LANES
+		return image, ce.ERROR_VALUES[ce.NO_LANES], ce.NO_LANES, rt.STRAIGHT, 0.0
